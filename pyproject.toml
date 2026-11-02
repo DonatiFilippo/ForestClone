@@ -1,0 +1,16 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "pocket-forest"
+version = "0.1.0"
+description = "Lightweight offline focus timer and virtual forest"
+requires-python = ">=3.10"
+dependencies = ["PySide6-Essentials>=6.6,<7"]
+
+[project.gui-scripts]
+pocket-forest = "forest_clone.main:main"
+
+[tool.setuptools.packages.find]
+where = ["src"]

@@ -1,0 +1,7 @@
+[Desktop Entry]
+Type=Application
+Name=Pocket Forest
+Exec=pocket-forest
+Icon=pocket-forest
+Categories=Utility;
+Terminal=false
