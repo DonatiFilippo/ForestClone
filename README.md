@@ -9,7 +9,11 @@ Python 3.10+, PySide6, and SQLite from Python standard library. No browser, back
 ## Features
 
 - Start, pause, resume, or cancel 15/25/45/60-minute and custom sessions
-- Lightweight painted tree and persistent forest
+- Choose a peach or pine tree before each session
+- Sessions under 30 minutes grow saplings; longer sessions scale to larger trees
+- Each completed hour plants a grown tree; a remaining partial hour adds a sapling (90 minutes plants one grown tree and one sapling)
+- Interrupted sessions leave one dead tree based on elapsed focus time
+- Lightweight painted terrain and persistent forest
 - Local chronological history and completion/interruption status
 - Completed count, focused time, daily time, trees, and day streak
 - Native completion notification where system tray support exists

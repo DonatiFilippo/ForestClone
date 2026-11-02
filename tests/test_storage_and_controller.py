@@ -1,4 +1,5 @@
 from pathlib import Path
+import sqlite3
 import tempfile
 import unittest
 
@@ -60,6 +61,26 @@ class StorageControllerTests(unittest.TestCase):
         self.assertIsNone(restored.active_session_id)
         self.assertEqual(restored.timer.state, TimerState.IDLE)
         self.assertEqual(self.storage.sessions()[0]["status"], "completed")
+
+    def test_existing_database_migrates_tree_type(self) -> None:
+        self.storage.close()
+        self.path.unlink()
+        connection = sqlite3.connect(self.path)
+        connection.execute(
+            """CREATE TABLE sessions (
+                id INTEGER PRIMARY KEY, started_at REAL NOT NULL,
+                duration_seconds INTEGER NOT NULL, status TEXT NOT NULL,
+                deadline REAL, remaining_seconds REAL NOT NULL, ended_at REAL
+            )"""
+        )
+        connection.commit()
+        connection.close()
+        self.storage = Storage(self.path)
+        session_id = self.storage.create_session(
+            self.clock.value, 60, self.clock.value + 60, "pine"
+        )
+        self.assertEqual(self.storage.active_session()["tree_type"], "pine")
+        self.storage.finish_session(session_id, False)
 
     def test_paused_session_restores_without_time_loss(self) -> None:
         first = FocusController(self.storage, self.clock)

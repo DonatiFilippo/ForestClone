@@ -32,6 +32,7 @@ from PySide6.QtWidgets import (
 )
 
 from ..app import FocusController
+from ..forest import TreeModel, live_tree_count, tree_scale, trees_for_session
 from ..statistics import calculate_statistics, format_duration
 from ..storage import Storage
 from ..timer import TimerState
@@ -42,28 +43,45 @@ def _draw_tree(
     x: float,
     ground: float,
     size: float,
-    variant: int = 0,
+    species: str = "peach",
     progress: float = 1.0,
+    *,
+    dead: bool = False,
+    sapling: bool = False,
 ) -> None:
-    """Draw one scalable vector tree. Variants add forest diversity."""
+    """Draw peach, pine, sapling, or interrupted-session tree."""
     painter.save()
     painter.translate(x, ground)
     growth = 0.38 + 0.62 * max(0.0, min(1.0, progress))
     painter.scale(size * growth / 100.0, size * growth / 100.0)
     painter.setPen(Qt.PenStyle.NoPen)
-
-    # Soft ground shadow.
     painter.setBrush(QColor(32, 74, 48, 35))
     painter.drawEllipse(QRectF(-34, -5, 68, 11))
 
-    if variant == 1:  # Pine
+    if dead:
+        painter.setPen(QPen(QColor("#705b4d"), 10, Qt.PenStyle.SolidLine, Qt.PenCapStyle.RoundCap))
+        painter.drawLine(QPointF(0, 0), QPointF(-3, -72))
+        painter.setPen(QPen(QColor("#705b4d"), 6, Qt.PenStyle.SolidLine, Qt.PenCapStyle.RoundCap))
+        painter.drawLine(QPointF(-2, -48), QPointF(-31, -76))
+        painter.drawLine(QPointF(-1, -57), QPointF(28, -88))
+        painter.drawLine(QPointF(-19, -65), QPointF(-32, -91))
+        painter.drawLine(QPointF(17, -76), QPointF(34, -70))
+        painter.setPen(QPen(QColor("#9c765e"), 2))
+        painter.drawLine(QPointF(1, -2), QPointF(-1, -67))
+        painter.restore()
+        return
+
+    if species == "pine":
         trunk = QLinearGradient(0, -55, 12, 0)
         trunk.setColorAt(0, QColor("#75503a"))
         trunk.setColorAt(1, QColor("#4e3528"))
         painter.setBrush(trunk)
         painter.drawRoundedRect(QRectF(-6, -48, 12, 50), 4, 4)
-        greens = ("#2f6f4e", "#3f855a", "#54a267")
-        for y, width, color in ((-82, 35, greens[0]), (-62, 48, greens[1]), (-40, 57, greens[2])):
+        layers = ((-82, 35, "#2f6f4e"), (-62, 48, "#3f855a"), (-40, 57, "#54a267"))
+        if sapling:
+            layers = ((-61, 28, "#3f855a"), (-42, 38, "#54a267"))
+        visible = max(1, round(progress * len(layers)))
+        for y, width, color in layers[-visible:]:
             painter.setBrush(QColor(color))
             painter.drawPolygon(
                 QPolygonF([QPointF(0, y - 35), QPointF(-width, y + 24), QPointF(width, y + 24)])
@@ -71,7 +89,6 @@ def _draw_tree(
         painter.setBrush(QColor(255, 255, 255, 24))
         painter.drawPolygon(QPolygonF([QPointF(-3, -111), QPointF(-28, -55), QPointF(-8, -62)]))
     else:
-        # Tapered trunk and visible branches give tree a natural silhouette.
         trunk_path = QPainterPath()
         trunk_path.moveTo(-10, 1)
         trunk_path.cubicTo(-8, -25, -7, -53, -3, -72)
@@ -88,32 +105,24 @@ def _draw_tree(
         painter.drawLine(QPointF(0, -54), QPointF(-24, -76))
         painter.drawLine(QPointF(2, -61), QPointF(24, -84))
         painter.setPen(Qt.PenStyle.NoPen)
-
-        palettes = (
-            ("#2f7d4b", "#41945a", "#59aa67", "#79bd7c"),
-            ("#32745a", "#408d69", "#58a979", "#78bd8b"),
-            ("#477d3b", "#5d9548", "#76aa56", "#94be68"),
-            ("#3a7552", "#4c8b60", "#65a773", "#8abd91"),
-        )
-        colors = palettes[variant % len(palettes)]
         clusters = [
-            (-31, -80, 32, colors[1]),
-            (29, -83, 34, colors[0]),
-            (-12, -109, 38, colors[0]),
-            (18, -112, 36, colors[1]),
-            (0, -84, 43, colors[2]),
-            (-40, -104, 25, colors[2]),
-            (42, -105, 24, colors[3]),
-            (2, -132, 28, colors[2]),
+            (-31, -80, 32, "#41945a"), (29, -83, 34, "#2f7d4b"),
+            (-12, -109, 38, "#2f7d4b"), (18, -112, 36, "#41945a"),
+            (0, -84, 43, "#59aa67"), (-40, -104, 25, "#59aa67"),
+            (42, -105, 24, "#79bd7c"), (2, -132, 28, "#59aa67"),
         ]
-        visible = max(3, round(3 + progress * (len(clusters) - 3)))
+        maximum = 3 if sapling else len(clusters)
+        visible = max(2, round(2 + progress * (maximum - 2)))
         for cx, cy, radius, color in clusters[:visible]:
             painter.setBrush(QColor(color))
             painter.drawEllipse(QRectF(cx - radius, cy - radius, radius * 2, radius * 2))
-        # Sparse highlights avoid flat circle appearance.
+        # Peach fruit makes species identifiable without text.
+        fruit = [(-22, -101), (24, -91), (4, -124), (38, -112), (-38, -88)]
+        for fx, fy in fruit[: 2 if sapling else len(fruit)]:
+            painter.setBrush(QColor("#f1a07f"))
+            painter.drawEllipse(QRectF(fx - 6, fy - 6, 12, 12))
         painter.setBrush(QColor(255, 255, 255, 33))
         painter.drawEllipse(QRectF(-36, -129, 27, 18))
-        painter.drawEllipse(QRectF(10, -129, 23, 15))
 
     painter.restore()
 
@@ -122,7 +131,9 @@ class TreeWidget(QWidget):
     def __init__(self) -> None:
         super().__init__()
         self.progress = 0.0
-        self.variant = 0
+        self.species = "peach"
+        self.final_scale = 0.65
+        self.sapling = False
         self.setMinimumSize(255, 255)
         self.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding)
 
@@ -130,15 +141,16 @@ class TreeWidget(QWidget):
         self.progress = progress
         self.update()
 
-    def set_variant(self, variant: int) -> None:
-        self.variant = variant
+    def set_tree(self, species: str, duration_seconds: int) -> None:
+        self.species = species
+        self.final_scale = tree_scale(duration_seconds)
+        self.sapling = duration_seconds < 30 * 60
         self.update()
 
     def paintEvent(self, event) -> None:  # type: ignore[no-untyped-def]
         painter = QPainter(self)
         painter.setRenderHint(QPainter.RenderHint.Antialiasing)
         dark = self.palette().color(QPalette.ColorRole.Window).lightness() < 128
-        # Quiet scenic background contained within illustration.
         sky = QColor("#22342b") if dark else QColor("#eff8ef")
         hill_back = QColor("#294437") if dark else QColor("#d9eed8")
         hill_front = QColor("#31513f") if dark else QColor("#c4e3c5")
@@ -154,8 +166,10 @@ class TreeWidget(QWidget):
         painter.drawEllipse(QRectF(scene.left() - 25, base - 32, scene.width() * 0.78, 76))
         painter.setBrush(hill_front)
         painter.drawEllipse(QRectF(scene.left() + scene.width() * 0.28, base - 24, scene.width() * 0.82, 67))
-        size = min(105.0, diameter * 0.43)
-        _draw_tree(painter, scene.center().x(), base + 8, size, self.variant, self.progress)
+        size = min(105.0, diameter * 0.43) * self.final_scale
+        _draw_tree(
+            painter, scene.center().x(), base + 8, size, self.species, self.progress, sapling=self.sapling
+        )
 
 
 class ForestCanvas(QWidget):
@@ -167,10 +181,14 @@ class ForestCanvas(QWidget):
     def __init__(self) -> None:
         super().__init__()
         self.sessions: list[object] = []
+        self.trees: list[TreeModel] = []
         self.setMinimumHeight(self.CLEARING_HEIGHT)
 
     def set_sessions(self, sessions: list[object]) -> None:
         self.sessions = sessions
+        self.trees = [
+            tree for session in sessions for tree in trees_for_session(session)  # type: ignore[arg-type]
+        ]
         self._update_height()
         self.update()
 
@@ -179,21 +197,21 @@ class ForestCanvas(QWidget):
         super().resizeEvent(event)
 
     def _update_height(self) -> None:
-        clearings = max(1, math.ceil(len(self.sessions) / self.TREES_PER_CLEARING))
+        clearings = max(1, math.ceil(len(self.trees) / self.TREES_PER_CLEARING))
         self.setMinimumHeight(clearings * self.CLEARING_HEIGHT)
 
     def paintEvent(self, event) -> None:  # type: ignore[no-untyped-def]
         painter = QPainter(self)
         painter.setRenderHint(QPainter.RenderHint.Antialiasing)
         dark = self.palette().color(QPalette.ColorRole.Window).lightness() < 128
-        clearings = max(1, math.ceil(len(self.sessions) / self.TREES_PER_CLEARING))
+        clearings = max(1, math.ceil(len(self.trees) / self.TREES_PER_CLEARING))
         for clearing in range(clearings):
             top = clearing * self.CLEARING_HEIGHT
             start = clearing * self.TREES_PER_CLEARING
-            end = min(start + self.TREES_PER_CLEARING, len(self.sessions))
+            end = min(start + self.TREES_PER_CLEARING, len(self.trees))
             self._draw_terrain(painter, top, clearing, dark)
             self._draw_trees(painter, top, start, end)
-        if not self.sessions:
+        if not self.trees:
             painter.setPen(QColor("#b7cabd") if dark else QColor("#536d5b"))
             painter.drawText(
                 QRectF(30, 145, self.width() - 60, 100),
@@ -269,7 +287,7 @@ class ForestCanvas(QWidget):
 
     def _draw_trees(self, painter: QPainter, top: float, start: int, end: int) -> None:
         width = self.width()
-        placements: list[tuple[float, float, float, int]] = []
+        placements: list[tuple[float, float, float, TreeModel]] = []
         column_order = (1, 4, 2, 5, 0, 3)
         for local, session_index in enumerate(range(start, end)):
             row, slot = divmod(local, 6)
@@ -281,10 +299,20 @@ class ForestCanvas(QWidget):
             river_x = width * (0.66 - 0.09 * ((ground - top - 175) / 215))
             if abs(x - river_x) < 45:
                 x += -58 if column < 3 else 58
-            size = 54 + row * 7 + (session_index * 7) % 8
-            placements.append((ground, x, size, session_index % 4))
-        for ground, x, size, variant in sorted(placements):
-            _draw_tree(painter, x, ground, size, variant, 1.0)
+            model = self.trees[session_index]
+            size = (58 + row * 7 + (session_index * 7) % 8) * model.scale
+            placements.append((ground, x, size, model))
+        for ground, x, size, model in sorted(placements, key=lambda item: item[0]):
+            _draw_tree(
+                painter,
+                x,
+                ground,
+                size,
+                model.species,
+                1.0,
+                dead=model.dead,
+                sapling=model.sapling,
+            )
 
 
 class MainWindow(QMainWindow):
@@ -421,12 +449,25 @@ class MainWindow(QMainWindow):
         self.custom_duration.setRange(1, 480)
         self.custom_duration.setSuffix(" min")
         self.custom_duration.setValue(25)
+        self.custom_duration.valueChanged.connect(self._tree_selection_changed)
         self.custom_duration.hide()
         duration_row.addWidget(duration_label)
         duration_row.addStretch()
         duration_row.addWidget(self.duration)
         duration_row.addWidget(self.custom_duration)
         controls.addLayout(duration_row)
+
+        species_row = QHBoxLayout()
+        species_label = QLabel("Tree to plant")
+        species_label.setObjectName("fieldLabel")
+        self.tree_species = QComboBox()
+        self.tree_species.addItem("Peach tree", "peach")
+        self.tree_species.addItem("Pine tree", "pine")
+        self.tree_species.currentIndexChanged.connect(self._tree_selection_changed)
+        species_row.addWidget(species_label)
+        species_row.addStretch()
+        species_row.addWidget(self.tree_species)
+        controls.addLayout(species_row)
 
         buttons = QHBoxLayout()
         self.primary_button = QPushButton("Start focusing")
@@ -578,12 +619,22 @@ class MainWindow(QMainWindow):
         self.custom_duration.setVisible(custom)
         if self.controller.timer.state == TimerState.IDLE:
             self.timer_label.setText(f"{self._selected_minutes():02d}:00")
+            self._tree_selection_changed()
+
+    def _tree_selection_changed(self, *_args: object) -> None:
+        if self.controller.timer.state != TimerState.IDLE:
+            return
+        species = str(self.tree_species.currentData())
+        self.tree.set_tree(species, self._selected_minutes() * 60)
+        self.storage.set_setting("tree_type", species)
 
     def _primary_action(self) -> None:
         state = self.controller.timer.state
         try:
             if state == TimerState.IDLE:
-                self.controller.start(self._selected_minutes() * 60)
+                self.controller.start(
+                    self._selected_minutes() * 60, str(self.tree_species.currentData())
+                )
             elif state == TimerState.RUNNING:
                 self.controller.pause()
             elif state == TimerState.PAUSED:
@@ -618,6 +669,7 @@ class MainWindow(QMainWindow):
         self.tree.set_progress(timer.progress if active else 1.0)
         self.duration.setEnabled(not active)
         self.custom_duration.setEnabled(not active)
+        self.tree_species.setEnabled(not active)
         self.cancel_button.setVisible(active)
         state_text = {
             TimerState.IDLE: "READY TO FOCUS",
@@ -641,15 +693,17 @@ class MainWindow(QMainWindow):
 
     def _notify_completion(self) -> None:
         QApplication.alert(self, 5000)
+        planted = live_tree_count(self.controller.timer.duration_seconds)
+        message = f"{planted} {'tree' if planted == 1 else 'trees'} planted. Nice work!"
         if self.notifications.isChecked() and self.tray.isVisible():
             self.tray.showMessage(
                 "Focus complete",
-                "Tree planted. Nice work!",
+                message,
                 QSystemTrayIcon.MessageIcon.Information,
                 5000,
             )
         else:
-            QMessageBox.information(self, "Focus complete", "Tree planted. Nice work!")
+            QMessageBox.information(self, "Focus complete", message)
 
     def _forest_period_bounds(self) -> tuple[date | None, date | None, str]:
         scope = self.forest_scope.currentText()
@@ -684,19 +738,33 @@ class MainWindow(QMainWindow):
 
     def _refresh_forest(self, *_args: object) -> None:
         start, end, label = self._forest_period_bounds()
-        completed = [row for row in self._sessions if row["status"] == "completed"]  # type: ignore[index]
+        finished = [
+            row
+            for row in self._sessions
+            if row["status"] in ("completed", "interrupted")  # type: ignore[index]
+        ]
         if start is not None and end is not None:
             visible = [
                 row
-                for row in completed
+                for row in finished
                 if start <= datetime.fromtimestamp(float(row["started_at"])).date() <= end  # type: ignore[index]
             ]
         else:
-            visible = completed
-        focused = sum(int(row["duration_seconds"]) for row in visible)  # type: ignore[index]
+            visible = finished
+        focused = sum(
+            int(row["duration_seconds"])
+            for row in visible
+            if row["status"] == "completed"  # type: ignore[index]
+        )
+        models = [
+            tree for session in visible for tree in trees_for_session(session)  # type: ignore[arg-type]
+        ]
+        live = sum(not tree.dead for tree in models)
+        dead = sum(tree.dead for tree in models)
+        dead_label = f"  •  {dead} WITHERED" if dead else ""
         self.forest_period_label.setText(label)
         self.forest_count.setText(
-            f"{len(visible)} {'TREE' if len(visible) == 1 else 'TREES'}  •  {format_duration(focused)} FOCUS"
+            f"{live} {'TREE' if live == 1 else 'TREES'}{dead_label}  •  {format_duration(focused)} FOCUS"
         )
         self.forest_canvas.set_sessions(visible)
         all_time = self.forest_scope.currentText() == "All"
@@ -712,7 +780,6 @@ class MainWindow(QMainWindow):
         self.streak_value.setText(f"{stats.streak_days} days")
         self.total_value.setText(format_duration(stats.focused_seconds))
         self._refresh_forest()
-        self.tree.set_variant(stats.trees_planted % 4)
         self.history.setRowCount(len(sessions))
         labels = {
             "completed": "Completed",
@@ -750,6 +817,14 @@ class MainWindow(QMainWindow):
         else:
             self.duration.setCurrentIndex(self.duration.count() - 1)
             self.custom_duration.setValue(minutes)
+        species = (
+            self.controller.tree_type
+            if self.controller.active_session_id is not None
+            else self.storage.get_setting("tree_type", "peach")
+        )
+        species_index = self.tree_species.findData(species)
+        self.tree_species.setCurrentIndex(max(0, species_index))
+        self.tree.set_tree(species, self.controller.timer.duration_seconds or minutes * 60)
         self.notifications.setChecked(self.storage.get_setting("notifications", "1") == "1")
         theme = self.storage.get_setting("theme", "System")
         self.theme.setCurrentText(theme)

@@ -17,6 +17,7 @@ class FocusController:
         self._clock = clock
         self.timer = FocusTimer(clock)
         self.active_session_id: int | None = None
+        self.tree_type = "peach"
         self._restore_active()
 
     def _restore_active(self) -> None:
@@ -24,6 +25,7 @@ class FocusController:
         if row is None:
             return
         self.active_session_id = int(row["id"])
+        self.tree_type = str(row["tree_type"])
         state = TimerState(str(row["status"]))
         self.timer.restore(
             state=state,
@@ -36,14 +38,18 @@ class FocusController:
             # Completion was recovered before UI existed to acknowledge/reset it.
             self.timer.reset()
 
-    def start(self, duration_seconds: int) -> None:
+    def start(self, duration_seconds: int, tree_type: str = "peach") -> None:
         if self.active_session_id is not None:
             raise RuntimeError("a focus session is already active")
+        if tree_type not in ("peach", "pine"):
+            raise ValueError("tree_type must be 'peach' or 'pine'")
+        self.tree_type = tree_type
         self.timer.start(duration_seconds)
         self.active_session_id = self.storage.create_session(
             self.timer.started_at or 0.0,
             duration_seconds,
             self.timer.deadline or 0.0,
+            tree_type,
         )
 
     def pause(self) -> None:

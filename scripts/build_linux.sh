@@ -31,8 +31,15 @@ EOF
   cp assets/pocket-forest.png AppDir/pocket-forest.png
   ln -s pocket-forest.png AppDir/.DirIcon
   ln -s usr/bin/pocket-forest AppDir/AppRun
+  runtime_cache="${XDG_CACHE_HOME:-$HOME/.cache}/pocket-forest/runtime-x86_64"
+  if [[ ! -s "$runtime_cache" ]]; then
+    mkdir -p "$(dirname "$runtime_cache")"
+    curl --fail --location --retry 8 --retry-all-errors --retry-delay 3 \
+      https://github.com/AppImage/type2-runtime/releases/download/continuous/runtime-x86_64 \
+      --output "$runtime_cache"
+  fi
   rm -f dist/PocketForest-x86_64.AppImage
-  appimagetool AppDir dist/PocketForest-x86_64.AppImage
+  appimagetool --runtime-file "$runtime_cache" AppDir dist/PocketForest-x86_64.AppImage
   printf 'AppImage ready: dist/PocketForest-x86_64.AppImage\n'
 else
   printf 'Optional AppImage skipped: appimagetool not found. Portable folder remains usable.\n'

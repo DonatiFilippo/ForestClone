@@ -6,6 +6,8 @@ from dataclasses import dataclass
 from datetime import date, datetime, timedelta
 from typing import Iterable, Mapping, Any
 
+from .forest import live_tree_count
+
 
 @dataclass(frozen=True)
 class Statistics:
@@ -40,7 +42,8 @@ def calculate_statistics(
         cursor -= timedelta(days=1)
 
     count = len(completed)
-    return Statistics(count, focused_seconds, count, today_seconds, streak)
+    trees = sum(live_tree_count(int(row["duration_seconds"])) for row in completed)
+    return Statistics(count, focused_seconds, trees, today_seconds, streak)
 
 
 def format_duration(seconds: int) -> str:

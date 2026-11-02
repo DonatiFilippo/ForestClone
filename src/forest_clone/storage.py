@@ -30,7 +30,8 @@ class Storage:
                     ('running', 'paused', 'completed', 'interrupted')),
                 deadline REAL,
                 remaining_seconds REAL NOT NULL,
-                ended_at REAL
+                ended_at REAL,
+                tree_type TEXT NOT NULL DEFAULT 'peach'
             );
             CREATE UNIQUE INDEX IF NOT EXISTS one_active_session
                 ON sessions((1)) WHERE status IN ('running', 'paused');
@@ -42,6 +43,13 @@ class Storage:
             );
             """
         )
+        columns = {
+            str(row[1]) for row in self.connection.execute("PRAGMA table_info(sessions)")
+        }
+        if "tree_type" not in columns:
+            self.connection.execute(
+                "ALTER TABLE sessions ADD COLUMN tree_type TEXT NOT NULL DEFAULT 'peach'"
+            )
         self.connection.commit()
 
     @contextmanager
@@ -53,14 +61,20 @@ class Storage:
             raise RuntimeError(f"Could not save application data: {error}") from error
 
     def create_session(
-        self, started_at: float, duration_seconds: int, deadline: float
+        self,
+        started_at: float,
+        duration_seconds: int,
+        deadline: float,
+        tree_type: str = "peach",
     ) -> int:
+        if tree_type not in ("peach", "pine"):
+            raise ValueError("tree_type must be 'peach' or 'pine'")
         with self.transaction() as connection:
             cursor = connection.execute(
                 """INSERT INTO sessions
-                   (started_at, duration_seconds, status, deadline, remaining_seconds)
-                   VALUES (?, ?, 'running', ?, ?)""",
-                (started_at, duration_seconds, deadline, duration_seconds),
+                   (started_at, duration_seconds, status, deadline, remaining_seconds, tree_type)
+                   VALUES (?, ?, 'running', ?, ?, ?)""",
+                (started_at, duration_seconds, deadline, duration_seconds, tree_type),
             )
         return int(cursor.lastrowid)
 
