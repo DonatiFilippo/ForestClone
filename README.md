@@ -15,6 +15,7 @@ Python 3.10+, PySide6, and SQLite from Python standard library. No browser, back
 - Interrupted sessions leave one dead tree based on elapsed focus time
 - Lightweight painted terrain and persistent forest
 - Local chronological history and completion/interruption status
+- Hover forest trees for species, session date/time, duration, result, and multi-tree origin
 - Completed count, focused time, daily time, trees, and day streak
 - Native completion notification where system tray support exists
 - System, light, and dark themes
@@ -44,6 +45,22 @@ PowerShell:
 
 ```powershell
 $env:PYTHONPATH="src"; python -m unittest discover -s tests -v
+```
+
+## UI structure
+
+UI modules stay presentation-focused while `FocusController` owns timer/persistence coordination:
+
+```text
+src/forest_clone/ui/
+├── main_window.py      # page orchestration and application actions
+├── focus_view.py       # timer controls, preview, summary cards
+├── forest_view.py      # period controls and terrain canvas
+├── history_view.py     # session table
+├── settings_view.py    # preference form
+├── tree_painter.py     # shared peach/pine/sapling/dead rendering
+├── theme.py            # application stylesheet
+└── widgets.py          # small shared builders
 ```
 
 ## Distribution

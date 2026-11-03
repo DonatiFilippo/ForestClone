@@ -26,6 +26,8 @@ class ForestRulesTests(unittest.TestCase):
         self.assertFalse(trees[0].sapling)
         self.assertTrue(trees[1].sapling)
         self.assertLess(trees[1].scale, trees[0].scale)
+        self.assertEqual((trees[0].ordinal, trees[0].total), (1, 2))
+        self.assertEqual((trees[1].ordinal, trees[1].total), (2, 2))
 
     def test_short_session_is_sapling(self) -> None:
         trees = trees_for_session(

@@ -17,6 +17,11 @@ class TreeModel:
     sapling: bool
     scale: float
     session_id: int
+    started_at: float
+    duration_seconds: int
+    elapsed_seconds: float
+    ordinal: int
+    total: int
 
 
 def live_tree_count(duration_seconds: int) -> int:
@@ -45,6 +50,7 @@ def trees_for_session(session: Mapping[str, Any]) -> list[TreeModel]:
     if species not in VALID_SPECIES:
         species = "peach"
     session_id = int(session["id"]) if "id" in session.keys() else 0
+    started_at = float(session["started_at"]) if "started_at" in session.keys() else 0.0
 
     if status == "interrupted":
         elapsed = max(0.0, duration - float(session["remaining_seconds"]))
@@ -55,6 +61,11 @@ def trees_for_session(session: Mapping[str, Any]) -> list[TreeModel]:
                 sapling=elapsed < SAPLING_SECONDS,
                 scale=tree_scale(elapsed),
                 session_id=session_id,
+                started_at=started_at,
+                duration_seconds=duration,
+                elapsed_seconds=elapsed,
+                ordinal=1,
+                total=1,
             )
         ]
 
@@ -66,18 +77,31 @@ def trees_for_session(session: Mapping[str, Any]) -> list[TreeModel]:
                 sapling=duration < SAPLING_SECONDS,
                 scale=tree_scale(duration),
                 session_id=session_id,
+                started_at=started_at,
+                duration_seconds=duration,
+                elapsed_seconds=duration,
+                ordinal=1,
+                total=1,
             )
         ]
 
     full_hours, remainder = divmod(duration, 3600)
-    grown = TreeModel(
-        species=species,
-        dead=False,
-        sapling=False,
-        scale=tree_scale(duration),
-        session_id=session_id,
-    )
-    trees = [grown for _ in range(full_hours)]
+    total = full_hours + int(remainder > 0)
+    trees = [
+        TreeModel(
+            species=species,
+            dead=False,
+            sapling=False,
+            scale=tree_scale(duration),
+            session_id=session_id,
+            started_at=started_at,
+            duration_seconds=duration,
+            elapsed_seconds=duration,
+            ordinal=ordinal,
+            total=total,
+        )
+        for ordinal in range(1, full_hours + 1)
+    ]
     if remainder:
         trees.append(
             TreeModel(
@@ -86,6 +110,11 @@ def trees_for_session(session: Mapping[str, Any]) -> list[TreeModel]:
                 sapling=True,
                 scale=min(0.60, tree_scale(remainder)),
                 session_id=session_id,
+                started_at=started_at,
+                duration_seconds=duration,
+                elapsed_seconds=duration,
+                ordinal=total,
+                total=total,
             )
         )
     return trees
