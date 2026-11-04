@@ -70,6 +70,7 @@ class FocusController:
             ended_at=self._clock(),
             remaining_seconds=remaining,
         )
+        self.storage.set_setting("tree_type", self.tree_type)
         self.active_session_id = None
         self.timer.cancel()
 
@@ -81,6 +82,7 @@ class FocusController:
             self.storage.finish_session(
                 self.active_session_id, True, ended_at=self._clock()
             )
+            self.storage.set_setting("tree_type", self.tree_type)
             self.active_session_id = None
             return True
         return False

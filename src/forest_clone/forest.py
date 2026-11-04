@@ -32,6 +32,17 @@ def live_tree_count(duration_seconds: int) -> int:
     return full_hours + int(remainder > 0)
 
 
+def describe_tree_yield(duration_seconds: int, species: str) -> str:
+    """Human-readable reward summary for overlays and desktop notifications."""
+    name = "peach" if species == "peach" else "pine"
+    if duration_seconds < 3600:
+        kind = "sapling" if duration_seconds < SAPLING_SECONDS else "tree"
+        return f"1 {name} {kind} planted"
+    full_hours, remainder = divmod(duration_seconds, 3600)
+    grown = f"{full_hours} grown {name} {'tree' if full_hours == 1 else 'trees'}"
+    return f"{grown} and 1 {name} sapling planted" if remainder else f"{grown} planted"
+
+
 def tree_scale(duration_seconds: float) -> float:
     """Readable bounded size curve from short sapling to four-hour tree."""
     duration = max(0.0, duration_seconds)

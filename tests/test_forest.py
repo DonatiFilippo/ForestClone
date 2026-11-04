@@ -1,6 +1,6 @@
 import unittest
 
-from forest_clone.forest import live_tree_count, trees_for_session
+from forest_clone.forest import describe_tree_yield, live_tree_count, trees_for_session
 
 
 class ForestRulesTests(unittest.TestCase):
@@ -11,6 +11,15 @@ class ForestRulesTests(unittest.TestCase):
         self.assertEqual(live_tree_count(119 * 60), 2)
         self.assertEqual(live_tree_count(2 * 3600), 2)
         self.assertEqual(live_tree_count(4 * 3600), 4)
+
+    def test_reward_description_matches_tree_rules(self) -> None:
+        self.assertEqual(describe_tree_yield(25 * 60, "pine"), "1 pine sapling planted")
+        self.assertEqual(describe_tree_yield(45 * 60, "peach"), "1 peach tree planted")
+        self.assertEqual(
+            describe_tree_yield(90 * 60, "peach"),
+            "1 grown peach tree and 1 peach sapling planted",
+        )
+        self.assertEqual(describe_tree_yield(2 * 3600, "pine"), "2 grown pine trees planted")
 
     def test_ninety_minutes_plants_grown_tree_and_sapling(self) -> None:
         trees = trees_for_session(

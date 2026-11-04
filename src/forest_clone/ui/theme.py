@@ -64,6 +64,19 @@ def apply_theme(app: QApplication, theme: str) -> None:
         QCheckBox::indicator {{ width: 17px; height: 17px; border: 1px solid {colors['border']}; border-radius: 4px; background: {colors['input']}; }}
         QCheckBox::indicator:checked {{ background: #438f59; border-color: #438f59; }}
         QFormLayout QLabel {{ color: {colors['text']}; }}
+        QFrame#completionOverlay {{ background: rgba(5, 12, 8, 215); border: none; }}
+        QFrame#celebrationCard {{ background: {colors['surface']}; border: 1px solid {colors['border']}; border-radius: 18px; }}
+        QLabel#celebrationEyebrow {{ color: #4d9b63; font-size: 10px; font-weight: 800; letter-spacing: 2px; }}
+        QLabel#celebrationTitle {{ color: {colors['text']}; font-size: 34px; font-weight: 800; }}
+        QLabel#celebrationMessage {{ color: {colors['muted']}; font-size: 15px; }}
+        QFrame#notificationOverlay {{ background: {colors['surface']}; border: 1px solid {colors['border']}; border-left: 4px solid #4d9b63; border-radius: 12px; }}
+        QFrame#notificationOverlay[level="warning"] {{ border-left-color: #c68b43; }}
+        QLabel#notificationIcon {{ color: white; background: #4d9b63; border-radius: 17px; font-size: 18px; font-weight: 800; }}
+        QFrame#notificationOverlay[level="warning"] QLabel#notificationIcon {{ background: #c68b43; }}
+        QLabel#notificationTitle {{ color: {colors['text']}; font-size: 15px; font-weight: 750; }}
+        QLabel#notificationMessage {{ color: {colors['muted']}; font-size: 12px; }}
+        QPushButton#notificationAction {{ color: #438f59; background: transparent; border: none; padding: 0 4px; min-height: 26px; }}
+        QPushButton#notificationDismiss {{ color: {colors['muted']}; background: transparent; border: none; padding: 0 4px; min-height: 26px; font-weight: 500; }}
         QToolTip {{ color: {colors['text']}; background: {colors['surface']}; border: 1px solid {colors['border']}; }}
         """
     )

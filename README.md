@@ -9,7 +9,7 @@ Python 3.10+, PySide6, and SQLite from Python standard library. No browser, back
 ## Features
 
 - Start, pause, resume, or cancel 15/25/45/60-minute and custom sessions
-- Choose a peach or pine tree before each session
+- Choose a peach or pine tree before each session; last planted species remains selected after restart
 - Sessions under 30 minutes grow saplings; longer sessions scale to larger trees
 - Each completed hour plants a grown tree; a remaining partial hour adds a sapling (90 minutes plants one grown tree and one sapling)
 - Interrupted sessions leave one dead tree based on elapsed focus time
@@ -17,7 +17,10 @@ Python 3.10+, PySide6, and SQLite from Python standard library. No browser, back
 - Local chronological history and completion/interruption status
 - Hover forest trees for species, session date/time, duration, result, and multi-tree origin
 - Completed count, focused time, daily time, trees, and day streak
-- Native completion notification where system tray support exists
+- Large foreground completion celebration with matching animated tree, alert sounds, View Forest, and Plant Another actions
+- Compact non-modal interruption warning overlay
+- Native background notification where system tray support exists
+- Reward-aware messages describing species, grown trees, saplings, and withered trees
 - System, light, and dark themes
 - SQLite data under OS application-data directory
 

@@ -28,7 +28,7 @@ class SettingsView(QWidget):
         self.default_duration = QSpinBox()
         self.default_duration.setRange(1, 480)
         self.default_duration.setSuffix(" minutes")
-        self.notifications = QCheckBox("Use desktop notification; otherwise show a dialog")
+        self.notifications = QCheckBox("Send system notification when app is in background")
         self.theme = QComboBox()
         self.theme.addItems(["System", "Light", "Dark"])
         save = QPushButton("Save changes")

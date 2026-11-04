@@ -8,17 +8,20 @@ import math
 from PySide6.QtCore import Qt, QTimer, Signal
 from PySide6.QtWidgets import (
     QApplication, QFrame, QHBoxLayout, QLabel, QListWidget, QMainWindow,
-    QMessageBox, QStackedWidget, QStyle, QSystemTrayIcon, QVBoxLayout, QWidget,
+    QMessageBox, QStackedWidget, QVBoxLayout, QWidget,
 )
 
 from ..app import FocusController
-from ..forest import live_tree_count, trees_for_session
+from ..forest import describe_tree_yield, trees_for_session
+from ..notifications import NotificationService
 from ..statistics import calculate_statistics, format_duration
 from ..storage import Storage
 from ..timer import TimerState
+from .completion_overlay import CompletionOverlay
 from .focus_view import FocusView
 from .forest_view import ForestView
 from .history_view import HistoryView
+from .notification_overlay import NotificationOverlay
 from .settings_view import SettingsView
 from .theme import apply_theme
 
@@ -38,7 +41,7 @@ class MainWindow(QMainWindow):
         self.resize(940, 650)
         self.setMinimumSize(760, 540)
         self._build_ui()
-        self._build_tray()
+        self._build_notifications()
         self._connect_signals()
         self.tick_timer = QTimer(self)
         self.tick_timer.setInterval(500)
@@ -100,17 +103,25 @@ class MainWindow(QMainWindow):
         self.forest_view.scope_changed.connect(self._refresh_forest)
         self.settings_view.save_requested.connect(self._save_settings)
 
-    def _build_tray(self) -> None:
-        icon = self.style().standardIcon(QStyle.StandardPixmap.SP_ComputerIcon)
-        self.tray = QSystemTrayIcon(icon, self)
-        if QSystemTrayIcon.isSystemTrayAvailable():
-            self.tray.show()
+    def _build_notifications(self) -> None:
+        self.notification_overlay = NotificationOverlay(self.centralWidget())
+        self.completion_overlay = CompletionOverlay(self.centralWidget())
+        self.notifications = NotificationService(
+            self, self.notification_overlay, self.completion_overlay
+        )
+        self.setWindowIcon(self.notifications.tray.icon())
+
+    def resizeEvent(self, event) -> None:  # type: ignore[no-untyped-def]
+        super().resizeEvent(event)
+        if hasattr(self, "notification_overlay"):
+            self.notification_overlay.reposition()
+        if hasattr(self, "completion_overlay"):
+            self.completion_overlay.resize_to_parent()
 
     def _tree_selection_changed(self, *_args: object) -> None:
         if self.controller.timer.state != TimerState.IDLE:
             return
         self.focus_view.update_tree_preview()
-        self.storage.set_setting("tree_type", self.focus_view.selected_species())
         self._tick()
 
     def _primary_action(self) -> None:
@@ -137,9 +148,19 @@ class MainWindow(QMainWindow):
             "This session will be recorded as interrupted and leave a withered tree.",
         )
         if answer == QMessageBox.StandardButton.Yes:
+            timer = self.controller.timer
+            elapsed = max(0, timer.duration_seconds - round(timer.remaining_seconds))
+            species = self.controller.tree_type
             self.controller.cancel()
             self.data_changed.emit()
             self._tick()
+            self.notifications.notify(
+                "Session interrupted",
+                f"Focus stopped after {format_duration(elapsed)}. One withered {species} remains in your forest.",
+                level="warning",
+                desktop_enabled=self.settings_view.notifications.isChecked(),
+                view_action=self._show_forest,
+            )
 
     def _tick(self) -> None:
         completed = self.controller.check_completion()
@@ -153,15 +174,29 @@ class MainWindow(QMainWindow):
             self._tick()
 
     def _notify_completion(self) -> None:
-        QApplication.alert(self, 5000)
-        planted = live_tree_count(self.controller.timer.duration_seconds)
-        message = f"{planted} {'tree' if planted == 1 else 'trees'} planted. Nice work!"
-        if self.settings_view.notifications.isChecked() and self.tray.isVisible():
-            self.tray.showMessage(
-                "Focus complete", message, QSystemTrayIcon.MessageIcon.Information, 5000
-            )
-        else:
-            QMessageBox.information(self, "Focus complete", message)
+        timer = self.controller.timer
+        message = describe_tree_yield(timer.duration_seconds, self.controller.tree_type)
+        self.notifications.notify_completion(
+            f"{message}. Nice work!",
+            self.controller.tree_type,
+            timer.duration_seconds,
+            desktop_enabled=self.settings_view.notifications.isChecked(),
+            view_action=self._show_forest,
+            plant_action=self._plant_another,
+        )
+
+    def _plant_another(self) -> None:
+        self.showNormal()
+        self.navigation.setCurrentRow(0)
+        self.focus_view.update_tree_preview()
+        self.raise_()
+        self.activateWindow()
+
+    def _show_forest(self) -> None:
+        self.showNormal()
+        self.navigation.setCurrentRow(1)
+        self.raise_()
+        self.activateWindow()
 
     def _forest_period_bounds(self) -> tuple[date | None, date | None, str]:
         scope = self.forest_view.scope.currentText()

@@ -36,6 +36,20 @@ class StorageControllerTests(unittest.TestCase):
         self.assertEqual(row["status"], "completed")
         self.assertEqual(row["duration_seconds"], 60)
 
+    def test_tree_preference_updates_only_after_tree_is_planted(self) -> None:
+        controller = FocusController(self.storage, self.clock)
+        controller.start(60, "pine")
+        self.assertEqual(self.storage.get_setting("tree_type", "peach"), "peach")
+        self.clock.value += 61
+        controller.check_completion()
+        self.assertEqual(self.storage.get_setting("tree_type", "peach"), "pine")
+
+    def test_interrupted_tree_becomes_last_preference(self) -> None:
+        controller = FocusController(self.storage, self.clock)
+        controller.start(60, "pine")
+        controller.cancel()
+        self.assertEqual(self.storage.get_setting("tree_type", "peach"), "pine")
+
     def test_interrupted_session_persists_remaining_time(self) -> None:
         controller = FocusController(self.storage, self.clock)
         controller.start(60)
